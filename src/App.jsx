@@ -1,11 +1,11 @@
 /**
- * 版本: 1.9 (後台增強：體育之星管理 & CSV範本)
+ * 版本: 2.0 (BIG5 編碼支援 & 動態訓練時數)
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 體育之星管理: 後台新增完整表單，可上傳學生相片、輸入學年/姓名等資訊，直接發佈到「體育之星」頁面。
- * 2. Firebase Storage: 首次引入 Firebase Storage，用於處理圖片上傳、儲存及讀取。
- * 3. CSV 範本: 後台「學生數據管理」區塊新增「下載 CSV 範本」功能，方便老師準備匯入資料。
- * 4. 介面優化: 調整後台介面佈局，將不同功能的卡片分開，使邏輯更清晰。
+ * 1. 編碼支援: CSV 匯入功能現在可以正確讀取 BIG5 編碼的檔案，解決繁體中文亂碼問題。
+ * 2. 動態 X 軸: 「體學平衡」圖表的 X 軸 (訓練時數) 改為從匯入的 CSV 檔案動態讀取，不再是固定值。
+ * 3. 範本更新: CSV 下載範本已加入「每星期訓練時間」欄位，以配合新的圖表數據需求。
+ * 4. 完整代碼: 此版本包含所有頁面及功能的完整、未經折疊的代碼。
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -20,7 +20,6 @@ import {
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { getFirestore, collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
-// Ver 1.9: 引入 Firebase Storage
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // 系統設定
@@ -28,7 +27,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDyvozVkRinHF6llR9-6xVZb2gtov71jRU", 
   authDomain: "pewebsite-1a640.firebaseapp.com",
   projectId: "pewebsite-1a640",
-  storageBucket: "pewebsite-1a640.firebasestorage.app", // 確保 Storage Bucket 名稱正確
+  storageBucket: "pewebsite-1a640.firebasestorage.app",
   messagingSenderId: "851903281806",
   appId: "1:851903281806:web:26f894ca1ccc180636e7df"
 };
@@ -42,7 +41,7 @@ try {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
   db = getFirestore(app);
-  storage = getStorage(app); // Ver 1.9: 初始化 Storage
+  storage = getStorage(app);
 } catch (e) {
   console.error("Firebase 初始化失敗:", e);
 }
@@ -98,6 +97,7 @@ const Button = ({ children, onClick, variant = "primary", disabled = false, clas
   );
 };
 
+
 // --- 頁面組件 ---
 
 // 1. 側邊欄
@@ -110,12 +110,11 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     { id: 'reading', label: '體育閱讀', icon: <BookOpen size={20} /> },
     { id: 'admin', label: '老師管理後台', icon: <Lock size={20} /> },
   ];
-
   return (
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 1.9</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.0</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -147,7 +146,7 @@ const AnimatedCounter = ({ end, duration = 2000, suffix = "" }) => {
       if (entry.isIntersecting) {
         let start = 0;
         const range = end - start;
-        if (range === 0) return;
+        if (range === 0) { setCount(end); return; }
         const increment = end > 0 ? 1 : -1;
         const stepTime = Math.abs(Math.floor(duration / range));
         
@@ -188,7 +187,7 @@ const HomePage = () => {
     if (!db) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data());
+      const data = snapshot.docs.map(doc => doc.data()).filter(d => d.trainingHours && d.averageScore);
       setStudentPerformanceData(data);
     });
     return () => unsubscribe();
@@ -235,12 +234,12 @@ const HomePage = () => {
               <div className="h-48 w-full">
                 {studentPerformanceData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
-                      <CartesianGrid stroke="#334155" strokeDasharray="3 3"/>
-                      <XAxis type="number" dataKey="trainingHours" name="每週訓練時數" unit="hr" domain={[0, 'dataMax + 2']} tick={{ fill: '#94a3b8', fontSize: 10 }} />
-                      <YAxis type="number" dataKey="averageScore" name="學業成績" unit="分" domain={[60, 100]} tick={{ fill: '#94a3b8', fontSize: 10 }}/>
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px' }}/>
-                      <Scatter name="學生表現" data={studentPerformanceData} fill="#2563eb" />
+                    <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
+                      <CartesianGrid stroke="#e0e0e0" strokeDasharray="3 3"/>
+                      <XAxis type="number" dataKey="trainingHours" name="每週訓練時數" unit="hr" domain={[0, 'dataMax + 2']} tick={{ fill: '#64748b', fontSize: 10 }} />
+                      <YAxis type="number" dataKey="averageScore" name="學業成績" unit="分" domain={[60, 100]} tick={{ fill: '#64748b', fontSize: 10 }}/>
+                      <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: '8px' }}/>
+                      <Scatter name="學生表現" data={studentPerformanceData} fill="#3b82f6" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 ) : (
@@ -332,18 +331,9 @@ const EquipmentPage = ({ user }) => {
     const unsubscribe = onSnapshot(q, (snapshot) => setItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     return () => unsubscribe();
   }, []);
-  const handleBorrow = async (item) => {
-    if (user && item.stock > 0) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id), { stock: item.stock - 1 });
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'borrow_logs'), { itemName: item.name, action: 'borrow', user: user.email, time: new Date().toISOString() });
-    }
-  };
-  const handleReturn = async (item) => {
-    if (user) {
-      await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id), { stock: item.stock + 1 });
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'borrow_logs'), { itemName: item.name, action: 'return', user: user.email, time: new Date().toISOString() });
-    }
-  };
+  const handleBorrow = async (item) => { if (user && item.stock > 0) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id), { stock: item.stock - 1 }); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'borrow_logs'), { itemName: item.name, action: 'borrow', user: user.email, time: new Date().toISOString() }); } };
+  const handleReturn = async (item) => { if (user) { await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'inventory', item.id), { stock: item.stock + 1 }); await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'borrow_logs'), { itemName: item.name, action: 'return', user: user.email, time: new Date().toISOString() }); } };
+  
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800 dark:text-white">🏸 器材庫存管理</h2>{!user && <span className="text-sm text-red-500 bg-red-100 px-3 py-1 rounded-full">請登入以進行管理操作</span>}</div>
@@ -371,10 +361,8 @@ const StarsPage = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const dbStars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setStars(dbStars);
-      
       const years = [...new Set(dbStars.map(s => s.year))].sort().reverse();
       setAvailableYears(years);
-
       if (years.length > 0 && !yearFilter) {
         setYearFilter(years[0]);
       }
@@ -397,21 +385,11 @@ const StarsPage = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {filteredStars.map((star) => (
           <div key={star.id} className="group relative overflow-hidden rounded-xl shadow-lg aspect-[3/4]">
-            <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-slate-600">
-              {star.photoUrl ? <img src={star.photoUrl} alt={star.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" /> : <User size={64} />}
-            </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6">
-              <h3 className="text-2xl font-bold text-white">{star.name} ({star.class})</h3>
-              <p className="text-yellow-400 font-medium">{star.team}隊</p>
-              <p className="text-slate-300 text-sm mt-1">{star.award || '年度傑出運動員'}</p>
-            </div>
+            <div className="absolute inset-0 bg-slate-800 flex items-center justify-center text-slate-600"><img src={star.photoUrl} alt={star.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110" /></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-6"><h3 className="text-2xl font-bold text-white">{star.name} ({star.class})</h3><p className="text-yellow-400 font-medium">{star.team}隊</p><p className="text-slate-300 text-sm mt-1">{star.award || '年度傑出運動員'}</p></div>
           </div>
         ))}
-        {stars.length === 0 && (
-          <div className="col-span-full text-center py-20 text-slate-500 bg-white dark:bg-slate-800 rounded-xl">
-            本年度尚未有體育之星紀錄，請老師到後台新增。
-          </div>
-        )}
+        {stars.length === 0 && <div className="col-span-full text-center py-20 text-slate-500 bg-white dark:bg-slate-800 rounded-xl">本年度尚未有體育之星紀錄，請老師到後台新增。</div>}
       </div>
     </div>
   );
@@ -424,24 +402,8 @@ const ReadingPage = ({ user }) => {
   const handleSubmit = (e) => { e.preventDefault(); setSubmitted(true); setScore(100); };
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
-      <div className="lg:col-span-2 space-y-6">
-        <div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center"><BookOpen className="mr-2 text-yellow-500" /> 本週閱讀教材：壁球入門與規則</h2>
-          <div className="aspect-video bg-slate-200 dark:bg-slate-900 rounded-lg flex items-center justify-center text-slate-500"><p>PDF 閱讀器 (Ver 1.9)</p></div>
-          <p className="mt-4 text-slate-600 dark:text-slate-300 leading-relaxed">壁球（Squash）是一項在封閉場地進行的室內運動。重點在於：1. 發球必須擊中前牆發球線上方。 2. 對手必須在球落地兩次前擊回。</p>
-        </div>
-      </div>
-      <div className="lg:col-span-1">
-        <div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700">
-          <h3 className="text-lg font-bold mb-4 text-yellow-400">📝 閱讀後小測</h3>
-          {!submitted ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div><p className="mb-2 text-sm">1. 壁球發球時，球必須擊中前牆哪條線上方？</p><div className="space-y-2"><label className="flex items-center space-x-2 cursor-pointer"><input type="radio" name="q1" className="text-yellow-500" required /><span className="text-sm text-slate-300">發球線 (Service Line)</span></label><label className="flex items-center space-x-2 cursor-pointer"><input type="radio" name="q1" className="text-yellow-500" /><span className="text-sm text-slate-300">底界線 (Tin)</span></label></div></div>
-              <button className="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded mt-4 transition-colors">提交答案</button>
-            </form>
-          ) : <div className="text-center py-6"><div className="text-4xl mb-2">🎉</div><h4 className="text-xl font-bold text-white">恭喜完成！</h4><p className="text-yellow-400 text-2xl font-bold my-2">{score} 分</p><button onClick={() => setSubmitted(false)} className="mt-4 text-sm text-slate-300 underline">重做測驗</button></div>}
-        </div>
-      </div>
+      <div className="lg:col-span-2 space-y-6"><div className="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700"><h2 className="text-xl font-bold text-slate-800 dark:text-white mb-4 flex items-center"><BookOpen className="mr-2 text-yellow-500" /> 本週閱讀教材：壁球入門與規則</h2><div className="aspect-video bg-slate-200 dark:bg-slate-900 rounded-lg flex items-center justify-center text-slate-500"><p>PDF 閱讀器 (Ver 2.0)</p></div><p className="mt-4 text-slate-600 dark:text-slate-300 leading-relaxed">壁球（Squash）是一項在封閉場地進行的室內運動。重點在於：1. 發球必須擊中前牆發球線上方。 2. 對手必須在球落地兩次前擊回。</p></div></div>
+      <div className="lg:col-span-1"><div className="bg-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-700"><h3 className="text-lg font-bold mb-4 text-yellow-400">📝 閱讀後小測</h3>{!submitted ? (<form onSubmit={handleSubmit} className="space-y-4"><div><p className="mb-2 text-sm">1. 壁球發球時，球必須擊中前牆哪條線上方？</p><div className="space-y-2"><label className="flex items-center space-x-2 cursor-pointer"><input type="radio" name="q1" className="text-yellow-500" required /><span className="text-sm text-slate-300">發球線 (Service Line)</span></label><label className="flex items-center space-x-2 cursor-pointer"><input type="radio" name="q1" className="text-yellow-500" /><span className="text-sm text-slate-300">底界線 (Tin)</span></label></div></div><button className="w-full bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-2 rounded mt-4 transition-colors">提交答案</button></form>) : <div className="text-center py-6"><div className="text-4xl mb-2">🎉</div><h4 className="text-xl font-bold text-white">恭喜完成！</h4><p className="text-yellow-400 text-2xl font-bold my-2">{score} 分</p><button onClick={() => setSubmitted(false)} className="mt-4 text-sm text-slate-300 underline">重做測驗</button></div>}</div></div>
     </div>
   );
 };
@@ -451,35 +413,33 @@ const AdminPage = ({ user }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isUploadingCSV, setIsUploadingCSV] = useState(false);
-  
-  // Ver 1.9: 新增體育之星相關 state
   const [starForm, setStarForm] = useState({ year: '2024-2025', name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
   const [isUploadingStar, setIsUploadingStar] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
 
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e) { alert("登入失敗: " + e.message); } };
   
+  // Ver 2.0: 更新 CSV 匯入功能以支援 BIG5
   const handleStudentCSVImport = (event) => {
     const file = event.target.files[0];
     if (!file || !db) return;
     setIsUploadingCSV(true);
+
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        const text = e.target.result;
+        // 使用 TextDecoder 將 ArrayBuffer 轉為 BIG5 編碼的文字
+        const text = new TextDecoder('big5').decode(e.target.result);
+        
         const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
-        if (lines.length <= 1) {
-          alert("CSV 檔案為空或只包含標題。");
-          setIsUploadingCSV(false);
-          return;
-        }
+        if (lines.length <= 1) { throw new Error("CSV 檔案為空或只包含標題。"); }
+
         const headers = lines[0].split(',').map(h => h.trim());
-        const requiredHeaders = ['學生姓名', '班別', '學號', '所屬校隊', '考試平均分'];
+        const requiredHeaders = ['學生姓名', '班別', '學號', '所屬校隊', '考試平均分', '每星期訓練時間'];
         if (requiredHeaders.some(h => !headers.includes(h))) {
-          alert(`CSV 標題不完整，必須包含: ${requiredHeaders.join(', ')}`);
-          setIsUploadingCSV(false);
-          return;
+          throw new Error(`CSV 標題不完整，必須包含: ${requiredHeaders.join(', ')}`);
         }
+
         const students = lines.slice(1).map(line => {
           const values = line.split(',');
           return {
@@ -488,34 +448,44 @@ const AdminPage = ({ user }) => {
             studentId: values[headers.indexOf('學號')]?.trim(),
             team: values[headers.indexOf('所屬校隊')]?.trim(),
             averageScore: parseFloat(values[headers.indexOf('考試平均分')]),
-            trainingHours: 5 // 🔴 注意：此為佔位符
+            trainingHours: parseFloat(values[headers.indexOf('每星期訓練時間')])
           };
-        }).filter(s => s.name && s.studentId && !isNaN(s.averageScore));
+        }).filter(s => s.name && s.studentId && !isNaN(s.averageScore) && !isNaN(s.trainingHours));
+
+        if (students.length === 0) {
+            throw new Error("沒有找到有效的學生數據。請檢查檔案內容和格式。");
+        }
 
         const batch = writeBatch(db);
         const studentsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'students');
+        // 考慮先刪除舊數據，避免重複
+        const oldDocs = await getDocs(studentsCollection);
+        oldDocs.forEach(doc => batch.delete(doc.ref));
+        
         students.forEach(studentData => {
             const docRef = doc(studentsCollection);
             batch.set(docRef, studentData);
         });
 
         await batch.commit();
-        alert(`成功匯入 ${students.length} 位學生的資料！`);
+        alert(`成功匯入 ${students.length} 位學生的資料！舊數據已被覆蓋。`);
+
       } catch (err) {
         console.error("匯入失敗:", err);
         alert(`匯入過程中發生錯誤: ${err.message}`);
       } finally {
         setIsUploadingCSV(false);
-        event.target.value = null; // 重置 file input
+        event.target.value = null;
       }
     };
-    reader.readAsText(file);
+    // 以 ArrayBuffer 格式讀取，以便後續解碼
+    reader.readAsArrayBuffer(file);
   };
   
-  // Ver 1.9: 下載 CSV 範本
+  // Ver 2.0: 更新 CSV 範本下載功能
   const downloadCSVTemplate = () => {
-    const headers = "學生姓名,班別,學號,所屬校隊,考試平均分";
-    const example = "陳小明,6A,1,壁球隊,85.5";
+    const headers = "學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間";
+    const example = "陳大文,6A,1,壁球隊,85.5,6";
     const csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headers + "\n" + example;
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
@@ -526,48 +496,21 @@ const AdminPage = ({ user }) => {
     document.body.removeChild(link);
   };
   
-  // Ver 1.9: 處理體育之星表單
-  const handleStarFormChange = (e) => {
-    const { name, value } = e.target;
-    setStarForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePhotoChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setStarForm(prev => ({ ...prev, photo: file }));
-      setPhotoPreview(URL.createObjectURL(file));
-    }
-  };
-
+  const handleStarFormChange = (e) => { const { name, value } = e.target; setStarForm(prev => ({ ...prev, [name]: value })); };
+  const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { setStarForm(prev => ({ ...prev, photo: file })); setPhotoPreview(URL.createObjectURL(file)); } };
   const handleStarSubmit = async (e) => {
     e.preventDefault();
-    if (!starForm.photo || !starForm.name || !starForm.year) {
-      alert("請填寫所有必填欄位（學年、姓名）並上傳相片。");
-      return;
-    }
+    if (!starForm.photo || !starForm.name || !starForm.year) { alert("請填寫所有必填欄位（學年、姓名）並上傳相片。"); return; }
     setIsUploadingStar(true);
     try {
-      // 1. 上傳圖片到 Storage
       const storageRef = ref(storage, `stars/${Date.now()}_${starForm.photo.name}`);
       const uploadResult = await uploadBytes(storageRef, starForm.photo);
-      // 2. 獲取圖片 URL
       const photoUrl = await getDownloadURL(uploadResult.ref);
-      // 3. 儲存完整資料到 Firestore
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), {
-        year: starForm.year,
-        name: starForm.name,
-        class: starForm.class,
-        team: starForm.team,
-        award: starForm.award,
-        photoUrl: photoUrl,
-        timestamp: serverTimestamp()
-      });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), { year: starForm.year, name: starForm.name, class: starForm.class, team: starForm.team, award: starForm.award, photoUrl: photoUrl, timestamp: serverTimestamp() });
       alert('體育之星已成功發佈！');
-      // 4. 重置表單
       setStarForm({ year: '2024-2025', name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
       setPhotoPreview(null);
-      if(e.target.photo) e.target.photo.value = null; // 清空 file input
+      e.target.reset();
     } catch (err) {
       console.error("發佈體育之星失敗:", err);
       alert("發佈失敗：" + err.message);
@@ -584,10 +527,9 @@ const AdminPage = ({ user }) => {
       <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-800 p-4 rounded-xl border-l-4 border-blue-500"><div className="flex items-center space-x-3"><div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">T</div><div><p className="font-bold text-slate-800 dark:text-white">體育主任</p><p className="text-xs text-slate-500">{user.email}</p></div></div><Button onClick={() => signOut(auth)} variant="secondary" className="!px-3 !py-2"><LogOut size={20} /></Button></div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* --- Ver 1.9: 新增年度體育之星 --- */}
         <Card className="lg:col-span-2">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">🌟 新增年度體育之星</h3>
-            <form onSubmit={handleStarSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <form onSubmit={handleStarSubmit} onReset={() => setPhotoPreview(null)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                     <input name="year" value={starForm.year} onChange={handleStarFormChange} placeholder="學年 (e.g. 2024-2025)" className="w-full p-2 border rounded bg-white dark:bg-slate-700" required />
                     <input name="name" value={starForm.name} onChange={handleStarFormChange} placeholder="學生姓名" className="w-full p-2 border rounded bg-white dark:bg-slate-700" required />
@@ -599,36 +541,24 @@ const AdminPage = ({ user }) => {
                         {photoPreview ? <img src={photoPreview} alt="預覽" className="h-full w-full object-contain rounded-lg p-2" /> : <div className="text-center text-slate-500"><UploadCloud size={40} className="mx-auto mb-2"/> <p>點擊此處上傳相片</p></div>}
                     </label>
                     <input id="photo-upload" name="photo" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-                    <Button type="submit" variant="success" disabled={isUploadingStar} className="w-full">
-                      {isUploadingStar ? "發佈中..." : "發佈體育之星"}
-                    </Button>
+                    <Button type="submit" variant="success" disabled={isUploadingStar} className="w-full"> {isUploadingStar ? "發佈中..." : "發佈體育之星"} </Button>
                 </div>
             </form>
         </Card>
 
-        {/* --- 學生數據管理 --- */}
-        <Card>
+        <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📊 學生數據管理</h3>
-          <div className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400">上傳CSV檔以更新「體學平衡」圖表數據。</p>
-            <div className="flex gap-2">
-                <label htmlFor="csv-upload" className={`flex-1 text-center px-4 py-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 ${isUploadingCSV ? 'bg-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
-                  <UploadCloud size={18}/>
-                  {isUploadingCSV ? '上傳中...' : '選擇 CSV'}
-                </label>
-                <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={handleStudentCSVImport} disabled={isUploadingCSV}/>
-                <Button onClick={downloadCSVTemplate} variant="secondary" className="flex-1"><FileText size={18}/> 下載範本</Button>
-            </div>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong class='text-red-500'>覆蓋</strong>所有舊數據。</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code>
+            </p>
+          <div className="flex gap-2">
+              <label htmlFor="csv-upload" className={`flex-1 text-center px-4 py-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 ${isUploadingCSV ? 'bg-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
+                <UploadCloud size={18}/> {isUploadingCSV ? '上傳中...' : '選擇 CSV 檔案'}
+              </label>
+              <input id="csv-upload" type="file" accept=".csv" className="hidden" onChange={handleStudentCSVImport} disabled={isUploadingCSV}/>
+              <Button onClick={downloadCSVTemplate} variant="secondary" className="flex-1"><FileText size={18}/> 下載範本</Button>
           </div>
-        </Card>
-
-        {/* --- 系統維護 (簡化) --- */}
-        <Card><h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📢 內容發佈</h3>
-            <div className="space-y-3">
-                 <input placeholder="最新動態標題" className="w-full p-2 border rounded bg-white dark:bg-slate-700" />
-                 <textarea placeholder="最新動態內容..." rows={3} className="w-full p-2 border rounded bg-white dark:bg-slate-700" />
-                 <Button variant="primary" className="w-full">發佈最新動態</Button>
-            </div>
         </Card>
       </div>
     </div>
@@ -642,19 +572,9 @@ export default function App() {
 
   useEffect(() => {
     if (!db || !auth) return;
-    const initAuth = async () => {
-      try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else if (!auth.currentUser) {
-          await signInAnonymously(auth);
-        }
-      } catch (e) { console.error("Auth 初始化失敗:", e); }
-    };
+    const initAuth = async () => { try { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } else if (!auth.currentUser) { await signInAnonymously(auth); } } catch (e) { console.error("Auth 初始化失敗:", e); } };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser && !currentUser.isAnonymous ? currentUser : null);
-    });
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => { setUser(currentUser && !currentUser.isAnonymous ? currentUser : null); });
     return () => unsubscribe();
   }, []);
 
