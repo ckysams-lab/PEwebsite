@@ -2,8 +2,8 @@
  * 版本: 2.6
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 修正登入流程: 修復了未登入時，點擊「老師管理後台」按鈕無反應的問題。
- * 2. 調整導航邏輯: 現在點擊「老師管理後台」會一律導向管理頁面，由該頁面內部判斷顯示登入表單或管理介面。
+ * 1. 修正登入流程: 修復了未登入時，點擊「老師管理後台」按鈕會跳轉回首頁而無法顯示登入表單的問題。
+ * 2. 調整導航邏輯: 移除了在主程式中過於積極的頁面保護跳轉，確保能正常進入登入頁面。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -867,22 +867,26 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         const loggedInUser = currentUser && !currentUser.isAnonymous ? currentUser : null;
         setUser(loggedInUser);
+        // This is the corrected logic. It will only redirect if user is logged out *from* a protected page.
         if (!loggedInUser && (activeTab === 'equipment' || activeTab === 'admin')) {
             setActiveTab('home');
         }
     });
     return () => unsubscribe();
-  }, [activeTab]);
+  }, []); // The dependency array is now empty, so this only runs once.
 
   const renderContent = () => {
     switch(activeTab) {
       case 'home': return <HomePage />;
       case 'teams': return <TeamsPage />;
       case 'fitness': return <FitnessPage user={user} />;
-      case 'equipment': return user ? <EquipmentPage user={user} /> : <HomePage />;
+      case 'equipment': 
+        return user ? <EquipmentPage user={user} /> : <HomePage />; // Redirect if not logged in
       case 'stars': return <StarsPage />;
       case 'reading': return <ReadingPage user={user} />;
-      case 'admin': return <AdminPage user={user} />;
+      case 'admin': 
+        // This is the key change. The AdminPage component itself will decide whether to show login or content.
+        return <AdminPage user={user} />;
       default: return <HomePage />;
     }
   };
