@@ -1,15 +1,15 @@
 /**
- * 版本: 2.2
+ * 版本: 2.3
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 圖表篩選功能: 在首頁的「學業與運動平衡」圖表下方，新增了依校隊篩選學生的核取方塊 (Checkbox) 功能。
- * 2. 動態篩選器: 篩選選項會根據匯入的學生數據動態生成。
- * 3. 即時更新: 圖表會根據用戶勾選的校隊即時反應，顯示或隱藏對應的數據點。
+ * 1. 後台榮譽榜管理: 在後台新增「發佈榮譽榜項目」功能，可輸入獎項類別、事件名稱及多位學生資料。
+ * 2. 榮譽榜動態化: 首頁的「榮譽榜」區塊改為從 Firestore 動態讀取數據，並根據類別分類展示。
+ * 3. 管理列表: 後台會顯示已發佈的榮譽榜項目列表，並提供刪除功能。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Home, Activity, Lock, Dumbbell, Star, BookOpen, Menu, Trophy, User, LogOut, ChevronRight, TrendingUp, AlertCircle, Calendar, Smile, Award, Medal, Target, ThumbsUp, Sparkles, Brain, Bot, Download, Save, Key, Users, Layers, Hourglass, BarChart2, Zap, Handshake, ShieldCheck, UploadCloud, FileText
+  Home, Activity, Lock, Dumbbell, Star, BookOpen, Menu, Trophy, User, LogOut, ChevronRight, TrendingUp, AlertCircle, Calendar, Smile, Award, Medal, Target, ThumbsUp, Sparkles, Brain, Bot, Download, Save, Key, Users, Layers, Hourglass, BarChart2, Zap, Handshake, ShieldCheck, UploadCloud, FileText, Trash2
 } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ScatterChart, Scatter, Legend
@@ -18,7 +18,7 @@ import {
 // --- Firebase 配置 ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, addDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, addDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // 系統設定
@@ -87,7 +87,8 @@ const Button = ({ children, onClick, variant = "primary", disabled = false, clas
     primary: "bg-yellow-500 text-slate-900 hover:bg-yellow-400 shadow-lg shadow-yellow-500/20",
     secondary: "bg-slate-700 text-white hover:bg-slate-600 border border-slate-600",
     ai: "bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white hover:brightness-110 shadow-lg shadow-fuchsia-500/30",
-    success: "bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-500/20"
+    success: "bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-500/20",
+    danger: "bg-red-600 text-white hover:bg-red-500"
   };
   return (
     <button onClick={onClick} disabled={disabled} className={`${baseStyle} ${variants[variant]} ${className}`}>
@@ -114,7 +115,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.2</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.3</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -184,19 +185,31 @@ const HomePage = () => {
   const [allStudentData, setAllStudentData] = useState([]);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [selectedTeams, setSelectedTeams] = useState([]);
+  const [hallOfFameItems, setHallOfFameItems] = useState([]);
 
   useEffect(() => {
     if (!db) return;
-    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    // Listener for student performance data
+    const qStudents = query(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
+    const unsubStudents = onSnapshot(qStudents, (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data()).filter(d => d.trainingHours && d.averageScore && d.team);
       setAllStudentData(data);
       
-      const teams = [...new Set(data.map(d => d.team))];
+      const teams = [...new Set(data.map(d => d.team))].sort();
       setAvailableTeams(teams);
       setSelectedTeams(teams); // 預設全選
     });
-    return () => unsubscribe();
+    
+    // Listener for Hall of Fame data
+    const qFame = query(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), orderBy('timestamp', 'desc'));
+    const unsubFame = onSnapshot(qFame, (snapshot) => {
+        setHallOfFameItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => {
+      unsubStudents();
+      unsubFame();
+    };
   }, []);
 
   const handleTeamSelectionChange = (team) => {
@@ -208,7 +221,23 @@ const HomePage = () => {
   const filteredData = useMemo(() => {
     return allStudentData.filter(student => selectedTeams.includes(student.team));
   }, [allStudentData, selectedTeams]);
-  
+
+  const groupedFameItems = useMemo(() => {
+      return hallOfFameItems.reduce((acc, item) => {
+          const category = item.category || '其他';
+          if (!acc[category]) {
+              acc[category] = [];
+          }
+          acc[category].push(item);
+          return acc;
+      }, {});
+  }, [hallOfFameItems]);
+
+  const fameCategories = [
+    { key: '冠軍榮譽', icon: '🏆' },
+    { key: '進步/突破獎', icon: '📈' }
+  ];
+
   return (
     <div className="animate-fade-in space-y-4">
       {/* --- 第一層: The "Wow" Factor --- */}
@@ -245,7 +274,30 @@ const HomePage = () => {
       {/* --- 第四層: Outcome & Holistic Development --- */}
       <Section title="成果與全人發展" subtitle="證明體育與學業能夠並行不悖，並著重於每位學生的個人成長。">
           <div className="space-y-8">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><Trophy className="text-yellow-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">榮譽榜 (The Hall of Fame)</h3></div><ul className="space-y-3"><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">🏆 冠軍榮譽</p><p className="text-xs text-slate-500 dark:text-slate-400">校隊在多項賽事中取得驕人成績。</p></li><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">📈 「進步獎」或「突破獎」</p><p className="text-xs text-slate-500 dark:text-slate-400">例子：田徑隊全體隊員平均個人最佳成績(PB)提升 <strong>15%</strong>。</p></li></ul></div>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center mb-4"><Trophy className="text-yellow-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">榮譽榜 (The Hall of Fame)</h3></div>
+                {hallOfFameItems.length > 0 ? (
+                    <div className="space-y-6">
+                        {fameCategories.map(cat => (
+                            groupedFameItems[cat.key] && (
+                                <div key={cat.key}>
+                                    <h4 className="font-bold text-lg text-slate-700 dark:text-slate-200 mb-2">{cat.icon} {cat.key}</h4>
+                                    <ul className="space-y-3">
+                                        {groupedFameItems[cat.key].map(item => (
+                                            <li key={item.id} className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg">
+                                                <p className="font-semibold text-slate-800 dark:text-slate-100">{item.eventName}</p>
+                                                <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">得獎學生: {item.studentNames} ({item.studentClasses})</p>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-slate-500 dark:text-slate-400 text-center py-4">本年度暫無榮譽記錄，請老師到後台新增。</p>
+                )}
+            </div>
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
               <div className="flex items-center mb-4"><BarChart2 className="text-blue-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">學業與運動平衡</h3></div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">數據顯示，適度的體育訓練與學業成績呈正相關或無負面影響。</p>
@@ -469,13 +521,27 @@ const AdminPage = ({ user }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isUploadingCSV, setIsUploadingCSV] = useState(false);
-  const [starForm, setStarForm] = useState({ year: '2024-2025', name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
+  // 體育之星
+  const [starForm, setStarForm] = useState({ year: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1), name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
   const [isUploadingStar, setIsUploadingStar] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
+  // 榮譽榜
+  const [fameForm, setFameForm] = useState({ category: '冠軍榮譽', eventName: '', studentNames: '', studentClasses: '' });
+  const [isSubmittingFame, setIsSubmittingFame] = useState(false);
+  const [hallOfFameItems, setHallOfFameItems] = useState([]);
+
 
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e) { alert("登入失敗: " + e.message); } };
   
-  // Ver 2.0: 更新 CSV 匯入功能以支援 BIG5
+  useEffect(() => {
+    if (!user) return;
+    const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), orderBy('timestamp', 'desc'));
+    const unsubscribe = onSnapshot(q, snapshot => {
+        setHallOfFameItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [user]);
+
   const handleStudentCSVImport = (event) => {
     const file = event.target.files[0];
     if (!file || !db) return;
@@ -484,18 +550,12 @@ const AdminPage = ({ user }) => {
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
-        // 使用 TextDecoder 將 ArrayBuffer 轉為 BIG5 編碼的文字
         const text = new TextDecoder('big5').decode(e.target.result);
-        
         const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
-        if (lines.length <= 1) { throw new Error("CSV 檔案為空或只包含標題。"); }
-
+        if (lines.length <= 1) throw new Error("CSV 檔案為空或只包含標題。");
         const headers = lines[0].split(',').map(h => h.trim());
         const requiredHeaders = ['學生姓名', '班別', '學號', '所屬校隊', '考試平均分', '每星期訓練時間'];
-        if (requiredHeaders.some(h => !headers.includes(h))) {
-          throw new Error(`CSV 標題不完整，必須包含: ${requiredHeaders.join(', ')}`);
-        }
-
+        if (requiredHeaders.some(h => !headers.includes(h))) throw new Error(`CSV 標題不完整，必須包含: ${requiredHeaders.join(', ')}`);
         const students = lines.slice(1).map(line => {
           const values = line.split(',');
           return {
@@ -507,38 +567,24 @@ const AdminPage = ({ user }) => {
             trainingHours: parseFloat(values[headers.indexOf('每星期訓練時間')])
           };
         }).filter(s => s.name && s.studentId && !isNaN(s.averageScore) && !isNaN(s.trainingHours));
-
-        if (students.length === 0) {
-            throw new Error("沒有找到有效的學生數據。請檢查檔案內容和格式。");
-        }
-
+        if (students.length === 0) throw new Error("沒有找到有效的學生數據。");
         const batch = writeBatch(db);
         const studentsCollection = collection(db, 'artifacts', appId, 'public', 'data', 'students');
-        // 考慮先刪除舊數據，避免重複
         const oldDocs = await getDocs(studentsCollection);
         oldDocs.forEach(doc => batch.delete(doc.ref));
-        
-        students.forEach(studentData => {
-            const docRef = doc(studentsCollection);
-            batch.set(docRef, studentData);
-        });
-
+        students.forEach(studentData => { const docRef = doc(studentsCollection); batch.set(docRef, studentData); });
         await batch.commit();
-        alert(`成功匯入 ${students.length} 位學生的資料！舊數據已被覆蓋。`);
-
+        alert(`成功匯入 ${students.length} 位學生的資料！`);
       } catch (err) {
-        console.error("匯入失敗:", err);
-        alert(`匯入過程中發生錯誤: ${err.message}`);
+        alert(`匯入失敗: ${err.message}`);
       } finally {
         setIsUploadingCSV(false);
         event.target.value = null;
       }
     };
-    // 以 ArrayBuffer 格式讀取，以便後續解碼
     reader.readAsArrayBuffer(file);
   };
   
-  // Ver 2.0: 更新 CSV 範本下載功能
   const downloadCSVTemplate = () => {
     const headers = "學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間";
     const example = "陳大文,6A,1,壁球隊,85.5,6";
@@ -556,25 +602,53 @@ const AdminPage = ({ user }) => {
   const handlePhotoChange = (e) => { const file = e.target.files[0]; if (file) { setStarForm(prev => ({ ...prev, photo: file })); setPhotoPreview(URL.createObjectURL(file)); } };
   const handleStarSubmit = async (e) => {
     e.preventDefault();
-    if (!starForm.photo || !starForm.name || !starForm.year) { alert("請填寫所有必填欄位（學年、姓名）並上傳相片。"); return; }
+    if (!starForm.photo || !starForm.name) { alert("請填寫姓名並上傳相片。"); return; }
     setIsUploadingStar(true);
     try {
       const storageRef = ref(storage, `stars/${Date.now()}_${starForm.photo.name}`);
       const uploadResult = await uploadBytes(storageRef, starForm.photo);
       const photoUrl = await getDownloadURL(uploadResult.ref);
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), { year: starForm.year, name: starForm.name, class: starForm.class, team: starForm.team, award: starForm.award, photoUrl: photoUrl, timestamp: serverTimestamp() });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), { ...starForm, photoUrl, timestamp: serverTimestamp() });
       alert('體育之星已成功發佈！');
-      setStarForm({ year: '2024-2025', name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
+      setStarForm({ year: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1), name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
       setPhotoPreview(null);
       e.target.reset();
     } catch (err) {
-      console.error("發佈體育之星失敗:", err);
       alert("發佈失敗：" + err.message);
     } finally {
       setIsUploadingStar(false);
     }
   };
 
+  const handleFameFormChange = (e) => { const { name, value } = e.target; setFameForm(prev => ({...prev, [name]: value})); };
+  const handleFameSubmit = async (e) => {
+      e.preventDefault();
+      if (!fameForm.eventName || !fameForm.studentNames) { alert("請填寫事件名稱和學生姓名。"); return; }
+      setIsSubmittingFame(true);
+      try {
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), {
+              ...fameForm,
+              timestamp: serverTimestamp()
+          });
+          alert('榮譽榜項目已發佈！');
+          setFameForm({ category: '冠軍榮譽', eventName: '', studentNames: '', studentClasses: '' });
+      } catch (err) {
+          alert('發佈失敗: ' + err.message);
+      } finally {
+          setIsSubmittingFame(false);
+      }
+  };
+
+  const deleteFameItem = async (id) => {
+      if (window.confirm("確定要刪除這個項目嗎？")) {
+          try {
+              await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame', id));
+              alert("項目已刪除。");
+          } catch (err) {
+              alert("刪除失敗: " + err.message);
+          }
+      }
+  };
 
   if (!user) return <div className="flex items-center justify-center min-h-[60vh]"><div className="bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-xl w-full max-w-md border border-slate-200 dark:border-slate-700"><h2 className="text-2xl font-bold text-slate-800 dark:text-white mb-6 text-center">🔐 老師登入</h2><form onSubmit={handleLogin} className="space-y-4"><input className="w-full p-3 border rounded bg-slate-50 dark:bg-slate-700 dark:text-white" value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email"/><input className="w-full p-3 border rounded bg-slate-50 dark:bg-slate-700 dark:text-white" type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password"/><Button type="submit" variant="primary" className="w-full">登入</Button></form></div></div>;
 
@@ -583,6 +657,40 @@ const AdminPage = ({ user }) => {
       <div className="flex justify-between items-center bg-slate-100 dark:bg-slate-800 p-4 rounded-xl border-l-4 border-blue-500"><div className="flex items-center space-x-3"><div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white font-bold">T</div><div><p className="font-bold text-slate-800 dark:text-white">體育主任</p><p className="text-xs text-slate-500">{user.email}</p></div></div><Button onClick={() => signOut(auth)} variant="secondary" className="!px-3 !py-2"><LogOut size={20} /></Button></div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <Card className="lg:col-span-2">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">🏆 發佈榮譽榜項目</h3>
+            <form onSubmit={handleFameSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <select name="category" value={fameForm.category} onChange={handleFameFormChange} className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white">
+                        <option value="冠軍榮譽">冠軍榮譽</option>
+                        <option value="進步/突破獎">進步/突破獎</option>
+                    </select>
+                    <input name="eventName" value={fameForm.eventName} onChange={handleFameFormChange} placeholder="獎項/事件名稱 (例如：校際壁球比賽)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" required />
+                </div>
+                <textarea name="studentNames" value={fameForm.studentNames} onChange={handleFameFormChange} placeholder="學生姓名 (多位請用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" required />
+                <textarea name="studentClasses" value={fameForm.studentClasses} onChange={handleFameFormChange} placeholder="對應班別 (多位請用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" />
+                <Button type="submit" variant="success" disabled={isSubmittingFame} className="w-full">
+                    {isSubmittingFame ? "發佈中..." : "發佈到榮譽榜"}
+                </Button>
+            </form>
+            <div className="mt-6">
+                <h4 className="text-md font-bold text-slate-700 dark:text-white mb-2">已發佈項目:</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                    {hallOfFameItems.map(item => (
+                        <div key={item.id} className="bg-slate-100 dark:bg-slate-700/50 p-2 rounded-lg flex justify-between items-center text-sm">
+                            <div>
+                                <p className="font-semibold text-slate-800 dark:text-slate-200">{item.eventName}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{item.studentNames}</p>
+                            </div>
+                            <Button onClick={() => deleteFameItem(item.id)} variant="danger" className="!px-2 !py-1 text-xs">
+                                <Trash2 size={14}/>
+                            </Button>
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </Card>
+
         <Card className="lg:col-span-2">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">🌟 新增年度體育之星</h3>
             <form onSubmit={handleStarSubmit} onReset={() => setPhotoPreview(null)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -604,7 +712,7 @@ const AdminPage = ({ user }) => {
 
         <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📊 學生數據管理</h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong class='text-red-500'>覆蓋</strong>所有舊數據。</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong className='text-red-500'>覆蓋</strong>所有舊數據。</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
               欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code>
             </p>
