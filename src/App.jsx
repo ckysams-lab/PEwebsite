@@ -1,10 +1,9 @@
 /**
- * 版本: 2.4
+ * 版本: 2.5
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 校隊詳情彈窗: 「我們的校隊」頁面新增點擊功能，點擊後會彈出視窗顯示該隊伍的詳細資料。
- * 2. 豐富校隊內容: 彈窗內可展示相片輪播、訓練時間、曾獲獎項、負責老師及相關連結。
- * 3. 後台校隊管理: 在後台新增「校隊資料管理」區塊，可透過表單編輯各校隊的詳細內容，並支援多圖上傳。
+ * 1. 器材管理權限: 「器材管理」頁面及側邊欄選項，現在只在老師登入後可見。
+ * 2. 頁面保護: 新增保護機制，未登入者無法透過直接訪問URL進入器材管理頁。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -101,21 +100,24 @@ const Button = ({ children, onClick, variant = "primary", disabled = false, clas
 // --- 頁面組件 ---
 
 // 1. 側邊欄
-const Sidebar = ({ activeTab, setActiveTab }) => {
-  const menuItems = [
+const Sidebar = ({ activeTab, setActiveTab, user }) => {
+  const allMenuItems = [
     { id: 'home', label: '首頁', icon: <Home size={20} /> },
     { id: 'teams', label: '我們的校隊', icon: <Users size={20} /> },
     { id: 'fitness', label: '科學化訓練', icon: <Activity size={20} /> },
-    { id: 'equipment', label: '器材管理', icon: <Dumbbell size={20} /> },
+    { id: 'equipment', label: '器材管理', icon: <Dumbbell size={20} />, requiresAuth: true },
     { id: 'stars', label: '體育之星', icon: <Star size={20} /> },
     { id: 'reading', label: '體育閱讀', icon: <BookOpen size={20} /> },
     { id: 'admin', label: '老師管理後台', icon: <Lock size={20} /> },
   ];
+
+  const menuItems = allMenuItems.filter(item => !item.requiresAuth || (item.requiresAuth && user));
+
   return (
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.4</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.5</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -398,7 +400,7 @@ const FitnessPage = ({ user }) => {
 };
 
 
-// 4. 器材管理組件
+// 4. 器材管理組件 (版本2.4的原始碼)
 const EquipmentPage = ({ user }) => {
   const [items, setItems] = useState([]);
   useEffect(() => {
@@ -593,7 +595,6 @@ const AdminPage = ({ user }) => {
   const [isSubmittingFame, setIsSubmittingFame] = useState(false);
   const [hallOfFameItems, setHallOfFameItems] = useState([]);
   
-  // 校隊管理
   const [teamEditId, setTeamEditId] = useState('');
   const [teamForm, setTeamForm] = useState({ teacher: '', trainingTime: '', awards: '', links: '', photos: [] });
   const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
@@ -627,7 +628,7 @@ const AdminPage = ({ user }) => {
                 trainingTime: data.trainingTime || '',
                 awards: data.awards || '',
                 links: (data.links || []).map(l => `${l.title},${l.url}`).join('\n'),
-                photos: [], // Reset on load
+                photos: [],
             });
         } else {
             setTeamForm({ teacher: '', trainingTime: '', awards: '', links: '', photos: [] });
@@ -675,7 +676,7 @@ const AdminPage = ({ user }) => {
               trainingTime: teamForm.trainingTime,
               awards: teamForm.awards,
               links: linksArray,
-              ...(photoURLs.length > 0 && { photoURLs }), // Only update photos if new ones are uploaded
+              ...(photoURLs.length > 0 && { photoURLs }),
           }, { merge: true });
 
           alert(`${currentTeam.name} 的資料已更新！`);
@@ -857,7 +858,9 @@ const AdminPage = ({ user }) => {
         <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📊 學生數據管理</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong className='text-red-500'>覆蓋</strong>所有舊數據。</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code></p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
+              欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code>
+            </p>
           <div className="flex gap-2">
               <label htmlFor="csv-upload" className={`flex-1 text-center px-4 py-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 ${isUploadingCSV ? 'bg-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
                 <UploadCloud size={18}/> {isUploadingCSV ? '上傳中...' : '選擇 CSV 檔案'}
@@ -880,26 +883,33 @@ export default function App() {
     if (!db || !auth) return;
     const initAuth = async () => { try { if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) { await signInWithCustomToken(auth, __initial_auth_token); } else if (!auth.currentUser) { await signInAnonymously(auth); } } catch (e) { console.error("Auth 初始化失敗:", e); } };
     initAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => { setUser(currentUser && !currentUser.isAnonymous ? currentUser : null); });
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+        const loggedInUser = currentUser && !currentUser.isAnonymous ? currentUser : null;
+        setUser(loggedInUser);
+        // If user logs out while on a protected page, redirect to home
+        if (!loggedInUser && (activeTab === 'equipment' || activeTab === 'admin')) {
+            setActiveTab('home');
+        }
+    });
     return () => unsubscribe();
-  }, []);
+  }, [activeTab]);
 
   const renderContent = () => {
     switch(activeTab) {
       case 'home': return <HomePage />;
       case 'teams': return <TeamsPage />;
       case 'fitness': return <FitnessPage user={user} />;
-      case 'equipment': return <EquipmentPage user={user} />;
+      case 'equipment': return user ? <EquipmentPage user={user} /> : <HomePage />;
       case 'stars': return <StarsPage />;
       case 'reading': return <ReadingPage user={user} />;
-      case 'admin': return <AdminPage user={user} />;
+      case 'admin': return user ? <AdminPage user={user} /> : <HomePage />;
       default: return <HomePage />;
     }
   };
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans overflow-hidden">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} />
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="md:hidden flex items-center p-4 bg-slate-900 text-white border-b border-slate-700"><button className="p-2"><Menu /></button><span className="ml-4 font-bold text-yellow-400">正覺體育人</span></div>
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 dark:bg-[#0F0F1B]"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
