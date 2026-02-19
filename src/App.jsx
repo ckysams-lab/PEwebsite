@@ -1,15 +1,15 @@
 /**
- * 版本: 2.3
+ * 版本: 2.4
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 後台榮譽榜管理: 在後台新增「發佈榮譽榜項目」功能，可輸入獎項類別、事件名稱及多位學生資料。
- * 2. 榮譽榜動態化: 首頁的「榮譽榜」區塊改為從 Firestore 動態讀取數據，並根據類別分類展示。
- * 3. 管理列表: 後台會顯示已發佈的榮譽榜項目列表，並提供刪除功能。
+ * 1. 校隊詳情彈窗: 「我們的校隊」頁面新增點擊功能，點擊後會彈出視窗顯示該隊伍的詳細資料。
+ * 2. 豐富校隊內容: 彈窗內可展示相片輪播、訓練時間、曾獲獎項、負責老師及相關連結。
+ * 3. 後台校隊管理: 在後台新增「校隊資料管理」區塊，可透過表單編輯各校隊的詳細內容，並支援多圖上傳。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Home, Activity, Lock, Dumbbell, Star, BookOpen, Menu, Trophy, User, LogOut, ChevronRight, TrendingUp, AlertCircle, Calendar, Smile, Award, Medal, Target, ThumbsUp, Sparkles, Brain, Bot, Download, Save, Key, Users, Layers, Hourglass, BarChart2, Zap, Handshake, ShieldCheck, UploadCloud, FileText, Trash2
+  Home, Activity, Lock, Dumbbell, Star, BookOpen, Menu, Trophy, User, LogOut, ChevronRight, ChevronLeft, X, TrendingUp, AlertCircle, Calendar, Smile, Award, Medal, Target, ThumbsUp, Sparkles, Brain, Bot, Download, Save, Key, Users, Layers, Hourglass, BarChart2, Zap, Handshake, ShieldCheck, UploadCloud, FileText, Trash2
 } from 'lucide-react';
 import { 
   Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Cell, ScatterChart, Scatter, Legend
@@ -18,7 +18,7 @@ import {
 // --- Firebase 配置 ---
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { getFirestore, collection, doc, addDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, getDocs, writeBatch } from 'firebase/firestore';
+import { getFirestore, collection, doc, addDoc, deleteDoc, query, orderBy, onSnapshot, serverTimestamp, updateDoc, getDoc, setDoc, getDocs, writeBatch } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // 系統設定
@@ -115,7 +115,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.3</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.4</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -189,18 +189,15 @@ const HomePage = () => {
 
   useEffect(() => {
     if (!db) return;
-    // Listener for student performance data
     const qStudents = query(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
     const unsubStudents = onSnapshot(qStudents, (snapshot) => {
       const data = snapshot.docs.map(doc => doc.data()).filter(d => d.trainingHours && d.averageScore && d.team);
       setAllStudentData(data);
-      
       const teams = [...new Set(data.map(d => d.team))].sort();
       setAvailableTeams(teams);
-      setSelectedTeams(teams); // 預設全選
+      setSelectedTeams(teams);
     });
     
-    // Listener for Hall of Fame data
     const qFame = query(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), orderBy('timestamp', 'desc'));
     const unsubFame = onSnapshot(qFame, (snapshot) => {
         setHallOfFameItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -225,22 +222,16 @@ const HomePage = () => {
   const groupedFameItems = useMemo(() => {
       return hallOfFameItems.reduce((acc, item) => {
           const category = item.category || '其他';
-          if (!acc[category]) {
-              acc[category] = [];
-          }
+          if (!acc[category]) acc[category] = [];
           acc[category].push(item);
           return acc;
       }, {});
   }, [hallOfFameItems]);
 
-  const fameCategories = [
-    { key: '冠軍榮譽', icon: '🏆' },
-    { key: '進步/突破獎', icon: '📈' }
-  ];
+  const fameCategories = [{ key: '冠軍榮譽', icon: '🏆' }, { key: '進步/突破獎', icon: '📈' }];
 
   return (
     <div className="animate-fade-in space-y-4">
-      {/* --- 第一層: The "Wow" Factor --- */}
       <div className="bg-gradient-to-br from-blue-900 via-slate-900 to-black p-8 md:p-12 rounded-3xl shadow-2xl text-white relative overflow-hidden border border-slate-700">
         <div className="relative z-10 text-center">
           <h1 className="text-4xl md:text-5xl font-extrabold text-yellow-400 mb-3 tracking-tight">看得見的卓越，可持續的成長</h1>
@@ -254,7 +245,6 @@ const HomePage = () => {
         <div className="absolute inset-0 bg-grid-slate-800 [mask-image:linear-gradient(to_bottom,white_5%,transparent)]"></div>
       </div>
 
-      {/* --- 第二層: The Pathway --- */}
       <Section title="系統化晉升階梯" subtitle="為每位孩子，無論起點，都提供清晰的成長路徑與機會。">
         <div className="grid md:grid-cols-3 gap-4 text-center">
             <div className="border-2 border-dashed border-teal-500/30 bg-teal-500/10 dark:bg-slate-800 p-6 rounded-xl flex flex-col items-center justify-center transform hover:scale-105 transition-transform duration-300"><div className="bg-teal-500 text-white rounded-full w-16 h-16 flex items-center justify-center text-xl font-bold mb-4">P1-P2</div><h3 className="text-xl font-bold text-teal-600 dark:text-teal-400">普及層</h3><p className="text-slate-600 dark:text-slate-300 mt-2 text-sm">興趣班與體適能基礎<br/>發掘潛能，多元化體驗</p><div className="mt-4 text-xs bg-teal-100 dark:bg-teal-900/50 text-teal-800 dark:text-teal-300 px-3 py-1 rounded-full">數據標籤：參與人數、涉及項目</div></div>
@@ -263,7 +253,6 @@ const HomePage = () => {
         </div>
       </Section>
       
-      {/* --- 第三層: The "Science & Tech" Edge --- */}
       <Section title="科學化訓練與專業支持" subtitle="引入AI科技與頂尖機構合作，確保每一分汗水都用在刀刃上。">
         <div className="grid md:grid-cols-2 gap-8">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><Zap className="text-purple-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">AI 科技應用</h3></div><div className="grid md:grid-cols-2 gap-4 items-center"><div className="w-full h-40 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center"><p className="text-slate-500 text-sm">[學生使用AI動作分析截圖/GIF]</p></div><p className="text-slate-600 dark:text-slate-300 text-sm">我們引入 AI 動作分析技術，客觀數據輔助教學，提升訓練效率達 <strong>30%</strong>。透過科學化的思維，為學生提供具體、可量化的反饋。</p></div></div>
@@ -271,7 +260,6 @@ const HomePage = () => {
         </div>
       </Section>
 
-      {/* --- 第四層: Outcome & Holistic Development --- */}
       <Section title="成果與全人發展" subtitle="證明體育與學業能夠並行不悖，並著重於每位學生的個人成長。">
           <div className="space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
@@ -341,7 +329,7 @@ const HomePage = () => {
   );
 };
 
-// 3. 科學化訓練 (原體適能評測)
+// 3. 科學化訓練
 const FitnessPage = ({ user }) => {
   const [formData, setFormData] = useState({ name: '', class: '6A', classNo: '', gender: 'M', sitUps: 0, flexibility: 0, handGrip: 0, run9min: 0, height: 150, weight: 40 });
   const [result, setResult] = useState(null);
@@ -497,21 +485,98 @@ const ReadingPage = ({ user }) => {
 };
 
 // 7. 我們的校隊
+const TeamModal = ({ team, onClose }) => {
+    const [currentPhotoIndex, setCurrentPhotoIndex] = useState(0);
+
+    if (!team) return null;
+
+    const nextPhoto = () => setCurrentPhotoIndex(prev => (prev + 1) % (team.photoURLs?.length || 1));
+    const prevPhoto = () => setCurrentPhotoIndex(prev => (prev - 1 + (team.photoURLs?.length || 1)) % (team.photoURLs?.length || 1));
+
+    return (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4 animate-fade-in" onClick={onClose}>
+            <div className="bg-slate-800 text-white rounded-2xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="p-6 relative">
+                    <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-white"><X size={24} /></button>
+                    <h2 className="text-3xl font-bold text-yellow-400 mb-4">{team.name}</h2>
+                    
+                    {team.photoURLs && team.photoURLs.length > 0 && (
+                        <div className="relative mb-6 w-full aspect-video bg-slate-900 rounded-lg overflow-hidden">
+                            <img src={team.photoURLs[currentPhotoIndex]} alt={`${team.name} photo ${currentPhotoIndex + 1}`} className="w-full h-full object-contain" />
+                            {team.photoURLs.length > 1 && <>
+                                <button onClick={prevPhoto} className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full hover:bg-black/80"><ChevronLeft/></button>
+                                <button onClick={nextPhoto} className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/50 p-2 rounded-full hover:bg-black/80"><ChevronRight/></button>
+                            </>}
+                        </div>
+                    )}
+                    
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <div>
+                                <h3 className="font-bold text-slate-400 uppercase text-sm tracking-wider">負責老師</h3>
+                                <p className="text-lg">{team.teacher || '待更新'}</p>
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-slate-400 uppercase text-sm tracking-wider">訓練時間</h3>
+                                <p className="text-lg whitespace-pre-wrap">{team.trainingTime || '待更新'}</p>
+                            </div>
+                            {team.links && team.links.length > 0 && (
+                                <div>
+                                    <h3 className="font-bold text-slate-400 uppercase text-sm tracking-wider">相關連結</h3>
+                                    <ul className="space-y-1 mt-1">
+                                        {team.links.map((link, i) => <li key={i}><a href={link.url} target="_blank" rel="noopener noreferrer" className="text-yellow-500 hover:underline">{link.title}</a></li>)}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-slate-400 uppercase text-sm tracking-wider">曾獲獎項</h3>
+                            <p className="text-md whitespace-pre-wrap mt-1">{team.awards || '待更新'}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const TeamsPage = () => {
-  const teams = ['壁球', '足球', '籃球', '田徑', '乒乓球', '游泳'];
+  const [teamsData, setTeamsData] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  
+  const teamList = [
+      { id: 'squash', name: '壁球隊' }, { id: 'football', name: '足球隊' },
+      { id: 'basketball', name: '籃球隊' }, { id: 'athletics', name: '田徑隊' },
+      { id: 'table_tennis', name: '乒乓球隊' }, { id: 'swimming', name: '游泳隊' }
+  ];
+
+  useEffect(() => {
+      const fetchTeamsData = async () => {
+          if (!db) return;
+          const data = await Promise.all(teamList.map(async team => {
+              const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'school_teams', team.id);
+              const docSnap = await getDoc(docRef);
+              return docSnap.exists() ? { id: team.id, ...docSnap.data() } : { id: team.id, name: team.name };
+          }));
+          setTeamsData(data);
+      };
+      fetchTeamsData();
+  }, []);
+
   return (
     <div className="animate-fade-in">
       <Card theme="dark">
         <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center"><Users className="mr-3"/>我們的校隊</h2>
         <p className="text-slate-400 mb-6">這是我們引以為傲的校隊大家庭。點擊了解更多關於各隊伍的資訊。</p>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {teams.map(team => (
-            <div key={team} className="bg-slate-800 hover:bg-slate-700 transition-colors p-4 rounded-lg text-center cursor-pointer">
-              <p className="font-bold text-white text-lg">{team}隊</p>
+          {teamsData.map(team => (
+            <div key={team.id} onClick={() => setSelectedTeam(team)} className="bg-slate-800 hover:bg-slate-700 transition-all duration-300 p-6 rounded-lg text-center cursor-pointer transform hover:-translate-y-1">
+              <p className="font-bold text-white text-xl">{team.name}</p>
             </div>
           ))}
         </div>
       </Card>
+      {selectedTeam && <TeamModal team={selectedTeam} onClose={() => setSelectedTeam(null)} />}
     </div>
   );
 };
@@ -521,32 +586,111 @@ const AdminPage = ({ user }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isUploadingCSV, setIsUploadingCSV] = useState(false);
-  // 體育之星
   const [starForm, setStarForm] = useState({ year: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1), name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
   const [isUploadingStar, setIsUploadingStar] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
-  // 榮譽榜
   const [fameForm, setFameForm] = useState({ category: '冠軍榮譽', eventName: '', studentNames: '', studentClasses: '' });
   const [isSubmittingFame, setIsSubmittingFame] = useState(false);
   const [hallOfFameItems, setHallOfFameItems] = useState([]);
-
+  
+  // 校隊管理
+  const [teamEditId, setTeamEditId] = useState('');
+  const [teamForm, setTeamForm] = useState({ teacher: '', trainingTime: '', awards: '', links: '', photos: [] });
+  const [isSubmittingTeam, setIsSubmittingTeam] = useState(false);
+  const teamList = [
+      { id: 'squash', name: '壁球隊' }, { id: 'football', name: '足球隊' },
+      { id: 'basketball', name: '籃球隊' }, { id: 'athletics', name: '田徑隊' },
+      { id: 'table_tennis', name: '乒乓球隊' }, { id: 'swimming', name: '游泳隊' }
+  ];
 
   const handleLogin = async (e) => { e.preventDefault(); try { await signInWithEmailAndPassword(auth, email, password); } catch(e) { alert("登入失敗: " + e.message); } };
   
   useEffect(() => {
     if (!user) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), orderBy('timestamp', 'desc'));
-    const unsubscribe = onSnapshot(q, snapshot => {
-        setHallOfFameItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    const unsubscribe = onSnapshot(q, snapshot => setHallOfFameItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))));
     return () => unsubscribe();
   }, [user]);
+  
+  useEffect(() => {
+    const fetchTeamData = async () => {
+        if (!teamEditId) {
+            setTeamForm({ teacher: '', trainingTime: '', awards: '', links: '', photos: [] });
+            return;
+        };
+        const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'school_teams', teamEditId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const data = docSnap.data();
+            setTeamForm({
+                teacher: data.teacher || '',
+                trainingTime: data.trainingTime || '',
+                awards: data.awards || '',
+                links: (data.links || []).map(l => `${l.title},${l.url}`).join('\n'),
+                photos: [], // Reset on load
+            });
+        } else {
+            setTeamForm({ teacher: '', trainingTime: '', awards: '', links: '', photos: [] });
+        }
+    };
+    fetchTeamData();
+  }, [teamEditId]);
+
+  const handleTeamFormChange = (e) => {
+    const { name, value, files } = e.target;
+    if (name === 'photos') {
+        setTeamForm(prev => ({ ...prev, photos: files }));
+    } else {
+        setTeamForm(prev => ({...prev, [name]: value}));
+    }
+  };
+
+  const handleTeamSubmit = async (e) => {
+      e.preventDefault();
+      if (!teamEditId) { alert("請先選擇要編輯的校隊。"); return; }
+      setIsSubmittingTeam(true);
+      try {
+          let photoURLs = [];
+          if (teamForm.photos.length > 0) {
+              photoURLs = await Promise.all(
+                  [...teamForm.photos].map(async file => {
+                      const storageRef = ref(storage, `school_teams/${teamEditId}/${Date.now()}_${file.name}`);
+                      await uploadBytes(storageRef, file);
+                      return await getDownloadURL(storageRef);
+                  })
+              );
+          }
+
+          const linksArray = teamForm.links.split('\n').filter(Boolean).map(line => {
+              const [title, url] = line.split(',');
+              return { title: title?.trim(), url: url?.trim() };
+          });
+
+          const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'school_teams', teamEditId);
+          const currentTeam = teamList.find(t => t.id === teamEditId);
+          
+          await setDoc(docRef, {
+              name: currentTeam.name,
+              teacher: teamForm.teacher,
+              trainingTime: teamForm.trainingTime,
+              awards: teamForm.awards,
+              links: linksArray,
+              ...(photoURLs.length > 0 && { photoURLs }), // Only update photos if new ones are uploaded
+          }, { merge: true });
+
+          alert(`${currentTeam.name} 的資料已更新！`);
+
+      } catch (err) {
+          alert('更新失敗: ' + err.message);
+      } finally {
+          setIsSubmittingTeam(false);
+      }
+  };
 
   const handleStudentCSVImport = (event) => {
     const file = event.target.files[0];
     if (!file || !db) return;
     setIsUploadingCSV(true);
-
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
@@ -575,12 +719,7 @@ const AdminPage = ({ user }) => {
         students.forEach(studentData => { const docRef = doc(studentsCollection); batch.set(docRef, studentData); });
         await batch.commit();
         alert(`成功匯入 ${students.length} 位學生的資料！`);
-      } catch (err) {
-        alert(`匯入失敗: ${err.message}`);
-      } finally {
-        setIsUploadingCSV(false);
-        event.target.value = null;
-      }
+      } catch (err) { alert(`匯入失敗: ${err.message}`); } finally { setIsUploadingCSV(false); event.target.value = null; }
     };
     reader.readAsArrayBuffer(file);
   };
@@ -608,16 +747,12 @@ const AdminPage = ({ user }) => {
       const storageRef = ref(storage, `stars/${Date.now()}_${starForm.photo.name}`);
       const uploadResult = await uploadBytes(storageRef, starForm.photo);
       const photoUrl = await getDownloadURL(uploadResult.ref);
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), { ...starForm, photoUrl, timestamp: serverTimestamp() });
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'stars'), { ...starForm, photoUrl: photoUrl, photo: null, timestamp: serverTimestamp() });
       alert('體育之星已成功發佈！');
       setStarForm({ year: new Date().getFullYear() + '-' + (new Date().getFullYear() + 1), name: '', class: '', team: '', award: '年度傑出運動員', photo: null });
       setPhotoPreview(null);
       e.target.reset();
-    } catch (err) {
-      alert("發佈失敗：" + err.message);
-    } finally {
-      setIsUploadingStar(false);
-    }
+    } catch (err) { alert("發佈失敗：" + err.message); } finally { setIsUploadingStar(false); }
   };
 
   const handleFameFormChange = (e) => { const { name, value } = e.target; setFameForm(prev => ({...prev, [name]: value})); };
@@ -626,17 +761,10 @@ const AdminPage = ({ user }) => {
       if (!fameForm.eventName || !fameForm.studentNames) { alert("請填寫事件名稱和學生姓名。"); return; }
       setIsSubmittingFame(true);
       try {
-          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), {
-              ...fameForm,
-              timestamp: serverTimestamp()
-          });
+          await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame'), { ...fameForm, timestamp: serverTimestamp() });
           alert('榮譽榜項目已發佈！');
           setFameForm({ category: '冠軍榮譽', eventName: '', studentNames: '', studentClasses: '' });
-      } catch (err) {
-          alert('發佈失敗: ' + err.message);
-      } finally {
-          setIsSubmittingFame(false);
-      }
+      } catch (err) { alert('發佈失敗: ' + err.message); } finally { setIsSubmittingFame(false); }
   };
 
   const deleteFameItem = async (id) => {
@@ -644,9 +772,7 @@ const AdminPage = ({ user }) => {
           try {
               await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'hall_of_fame', id));
               alert("項目已刪除。");
-          } catch (err) {
-              alert("刪除失敗: " + err.message);
-          }
+          } catch (err) { alert("刪除失敗: " + err.message); }
       }
   };
 
@@ -658,6 +784,31 @@ const AdminPage = ({ user }) => {
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card className="lg:col-span-2">
+            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📢 校隊資料管理</h3>
+            <form onSubmit={handleTeamSubmit} className="space-y-4">
+                <select onChange={(e) => setTeamEditId(e.target.value)} value={teamEditId} className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" required>
+                    <option value="">-- 選擇要編輯的校隊 --</option>
+                    {teamList.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                </select>
+                {teamEditId && (
+                    <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <input name="teacher" value={teamForm.teacher} onChange={handleTeamFormChange} placeholder="負責老師" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" />
+                        <textarea name="trainingTime" value={teamForm.trainingTime} onChange={handleTeamFormChange} placeholder="訓練時間 (可多行)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" />
+                        <textarea name="awards" value={teamForm.awards} onChange={handleTeamFormChange} placeholder="曾獲獎項 (可多行)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="3" />
+                        <textarea name="links" value={teamForm.links} onChange={handleTeamFormChange} placeholder="相關連結 (每行一筆, 格式: 名稱,網址)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" />
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">上傳新相片 (將取代舊相片)</label>
+                            <input name="photos" type="file" multiple accept="image/*" onChange={handleTeamFormChange} className="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" />
+                        </div>
+                        <Button type="submit" variant="success" disabled={isSubmittingTeam} className="w-full">
+                            {isSubmittingTeam ? '更新中...' : `更新 ${teamList.find(t=>t.id===teamEditId)?.name} 資料`}
+                        </Button>
+                    </div>
+                )}
+            </form>
+        </Card>
+
+        <Card className="lg:col-span-2">
             <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">🏆 發佈榮譽榜項目</h3>
             <form onSubmit={handleFameSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -665,26 +816,19 @@ const AdminPage = ({ user }) => {
                         <option value="冠軍榮譽">冠軍榮譽</option>
                         <option value="進步/突破獎">進步/突破獎</option>
                     </select>
-                    <input name="eventName" value={fameForm.eventName} onChange={handleFameFormChange} placeholder="獎項/事件名稱 (例如：校際壁球比賽)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" required />
+                    <input name="eventName" value={fameForm.eventName} onChange={handleFameFormChange} placeholder="獎項/事件名稱" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" required />
                 </div>
-                <textarea name="studentNames" value={fameForm.studentNames} onChange={handleFameFormChange} placeholder="學生姓名 (多位請用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" required />
-                <textarea name="studentClasses" value={fameForm.studentClasses} onChange={handleFameFormChange} placeholder="對應班別 (多位請用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" />
-                <Button type="submit" variant="success" disabled={isSubmittingFame} className="w-full">
-                    {isSubmittingFame ? "發佈中..." : "發佈到榮譽榜"}
-                </Button>
+                <textarea name="studentNames" value={fameForm.studentNames} onChange={handleFameFormChange} placeholder="學生姓名 (多位用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" required />
+                <textarea name="studentClasses" value={fameForm.studentClasses} onChange={handleFameFormChange} placeholder="對應班別 (多位用逗號分隔)" className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:text-white" rows="2" />
+                <Button type="submit" variant="success" disabled={isSubmittingFame} className="w-full"> {isSubmittingFame ? "發佈中..." : "發佈到榮譽榜"} </Button>
             </form>
             <div className="mt-6">
                 <h4 className="text-md font-bold text-slate-700 dark:text-white mb-2">已發佈項目:</h4>
                 <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                     {hallOfFameItems.map(item => (
                         <div key={item.id} className="bg-slate-100 dark:bg-slate-700/50 p-2 rounded-lg flex justify-between items-center text-sm">
-                            <div>
-                                <p className="font-semibold text-slate-800 dark:text-slate-200">{item.eventName}</p>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{item.studentNames}</p>
-                            </div>
-                            <Button onClick={() => deleteFameItem(item.id)} variant="danger" className="!px-2 !py-1 text-xs">
-                                <Trash2 size={14}/>
-                            </Button>
+                            <div><p className="font-semibold text-slate-800 dark:text-slate-200">{item.eventName}</p><p className="text-xs text-slate-500 dark:text-slate-400">{item.studentNames}</p></div>
+                            <Button onClick={() => deleteFameItem(item.id)} variant="danger" className="!px-2 !py-1 text-xs"><Trash2 size={14}/></Button>
                         </div>
                     ))}
                 </div>
@@ -713,9 +857,7 @@ const AdminPage = ({ user }) => {
         <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📊 學生數據管理</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong className='text-red-500'>覆蓋</strong>所有舊數據。</p>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
-              欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code>
-            </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">欄位必須為: <code className="text-rose-500 bg-rose-100 dark:bg-rose-900/50 p-1 rounded">學生姓名,班別,學號,所屬校隊,考試平均分,每星期訓練時間</code></p>
           <div className="flex gap-2">
               <label htmlFor="csv-upload" className={`flex-1 text-center px-4 py-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 ${isUploadingCSV ? 'bg-slate-400' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}>
                 <UploadCloud size={18}/> {isUploadingCSV ? '上傳中...' : '選擇 CSV 檔案'}
