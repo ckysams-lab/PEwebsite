@@ -1,9 +1,9 @@
 /**
- * 版本: 2.5
+ * 版本: 2.6
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 器材管理權限: 「器材管理」頁面及側邊欄選項，現在只在老師登入後可見。
- * 2. 頁面保護: 新增保護機制，未登入者無法透過直接訪問URL進入器材管理頁。
+ * 1. 修正登入流程: 修復了未登入時，點擊「老師管理後台」按鈕無反應的問題。
+ * 2. 調整導航邏輯: 現在點擊「老師管理後台」會一律導向管理頁面，由該頁面內部判斷顯示登入表單或管理介面。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -117,7 +117,7 @@ const Sidebar = ({ activeTab, setActiveTab, user }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.5</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.6</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -837,25 +837,6 @@ const AdminPage = ({ user }) => {
         </Card>
 
         <Card className="lg:col-span-2">
-            <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">🌟 新增年度體育之星</h3>
-            <form onSubmit={handleStarSubmit} onReset={() => setPhotoPreview(null)} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-4">
-                    <input name="year" value={starForm.year} onChange={handleStarFormChange} placeholder="學年 (e.g. 2024-2025)" className="w-full p-2 border rounded bg-white dark:bg-slate-700" required />
-                    <input name="name" value={starForm.name} onChange={handleStarFormChange} placeholder="學生姓名" className="w-full p-2 border rounded bg-white dark:bg-slate-700" required />
-                    <input name="class" value={starForm.class} onChange={handleStarFormChange} placeholder="班別" className="w-full p-2 border rounded bg-white dark:bg-slate-700" />
-                    <input name="team" value={starForm.team} onChange={handleStarFormChange} placeholder="所屬校隊" className="w-full p-2 border rounded bg-white dark:bg-slate-700" />
-                </div>
-                <div className="flex flex-col items-center justify-center space-y-4">
-                    <label htmlFor="photo-upload" className="w-full h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                        {photoPreview ? <img src={photoPreview} alt="預覽" className="h-full w-full object-contain rounded-lg p-2" /> : <div className="text-center text-slate-500"><UploadCloud size={40} className="mx-auto mb-2"/> <p>點擊此處上傳相片</p></div>}
-                    </label>
-                    <input id="photo-upload" name="photo" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
-                    <Button type="submit" variant="success" disabled={isUploadingStar} className="w-full"> {isUploadingStar ? "發佈中..." : "發佈體育之星"} </Button>
-                </div>
-            </form>
-        </Card>
-
-        <Card className="lg:col-span-2">
           <h3 className="text-lg font-bold text-slate-800 dark:text-white mb-4">📊 學生數據管理</h3>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">上傳CSV檔以更新「體學平衡」圖表數據。每次上傳將會<strong className='text-red-500'>覆蓋</strong>所有舊數據。</p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">
@@ -886,7 +867,6 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         const loggedInUser = currentUser && !currentUser.isAnonymous ? currentUser : null;
         setUser(loggedInUser);
-        // If user logs out while on a protected page, redirect to home
         if (!loggedInUser && (activeTab === 'equipment' || activeTab === 'admin')) {
             setActiveTab('home');
         }
@@ -902,7 +882,7 @@ export default function App() {
       case 'equipment': return user ? <EquipmentPage user={user} /> : <HomePage />;
       case 'stars': return <StarsPage />;
       case 'reading': return <ReadingPage user={user} />;
-      case 'admin': return user ? <AdminPage user={user} /> : <HomePage />;
+      case 'admin': return <AdminPage user={user} />;
       default: return <HomePage />;
     }
   };
