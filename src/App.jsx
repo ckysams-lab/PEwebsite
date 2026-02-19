@@ -1,12 +1,13 @@
 /**
- * 版本: 2.1
+ * 版本: 2.2
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 新增分頁: 在側邊欄加入「我們的校隊」分頁。
- * 2. 佈局調整: 首頁的「榮譽榜」與「學業與運動平衡」區塊改為垂直排列，各佔一行。
+ * 1. 圖表篩選功能: 在首頁的「學業與運動平衡」圖表下方，新增了依校隊篩選學生的核取方塊 (Checkbox) 功能。
+ * 2. 動態篩選器: 篩選選項會根據匯入的學生數據動態生成。
+ * 3. 即時更新: 圖表會根據用戶勾選的校隊即時反應，顯示或隱藏對應的數據點。
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Home, Activity, Lock, Dumbbell, Star, BookOpen, Menu, Trophy, User, LogOut, ChevronRight, TrendingUp, AlertCircle, Calendar, Smile, Award, Medal, Target, ThumbsUp, Sparkles, Brain, Bot, Download, Save, Key, Users, Layers, Hourglass, BarChart2, Zap, Handshake, ShieldCheck, UploadCloud, FileText
 } from 'lucide-react';
@@ -113,7 +114,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.1</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.2</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -180,17 +181,33 @@ const Section = ({ title, subtitle, children, className = "" }) => (
 );
 
 const HomePage = () => {
-  const [studentPerformanceData, setStudentPerformanceData] = useState([]);
+  const [allStudentData, setAllStudentData] = useState([]);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [selectedTeams, setSelectedTeams] = useState([]);
 
   useEffect(() => {
     if (!db) return;
     const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'students'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => doc.data()).filter(d => d.trainingHours && d.averageScore);
-      setStudentPerformanceData(data);
+      const data = snapshot.docs.map(doc => doc.data()).filter(d => d.trainingHours && d.averageScore && d.team);
+      setAllStudentData(data);
+      
+      const teams = [...new Set(data.map(d => d.team))];
+      setAvailableTeams(teams);
+      setSelectedTeams(teams); // 預設全選
     });
     return () => unsubscribe();
   }, []);
+
+  const handleTeamSelectionChange = (team) => {
+    setSelectedTeams(prev => 
+      prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]
+    );
+  };
+  
+  const filteredData = useMemo(() => {
+    return allStudentData.filter(student => selectedTeams.includes(student.team));
+  }, [allStudentData, selectedTeams]);
   
   return (
     <div className="animate-fade-in space-y-4">
@@ -229,22 +246,42 @@ const HomePage = () => {
       <Section title="成果與全人發展" subtitle="證明體育與學業能夠並行不悖，並著重於每位學生的個人成長。">
           <div className="space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><Trophy className="text-yellow-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">榮譽榜 (The Hall of Fame)</h3></div><ul className="space-y-3"><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">🏆 冠軍榮譽</p><p className="text-xs text-slate-500 dark:text-slate-400">校隊在多項賽事中取得驕人成績。</p></li><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">📈 「進步獎」或「突破獎」</p><p className="text-xs text-slate-500 dark:text-slate-400">例子：田徑隊全體隊員平均個人最佳成績(PB)提升 <strong>15%</strong>。</p></li></ul></div>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><BarChart2 className="text-blue-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">學業與運動平衡</h3></div><p className="text-sm text-slate-500 dark:text-slate-400 mb-4">數據顯示，適度的體育訓練與學業成績呈正相關或無負面影響。</p>
+            <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center mb-4"><BarChart2 className="text-blue-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">學業與運動平衡</h3></div>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">數據顯示，適度的體育訓練與學業成績呈正相關或無負面影響。</p>
               <div className="h-48 w-full">
-                {studentPerformanceData.length > 0 ? (
+                {allStudentData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <ScatterChart margin={{ top: 20, right: 30, bottom: 20, left: 20 }}>
-                      <CartesianGrid stroke="#e0e0e0" strokeDasharray="3 3"/>
+                      <CartesianGrid strokeDasharray="3 3"/>
                       <XAxis type="number" dataKey="trainingHours" name="每週訓練時數" unit="hr" domain={[0, 'dataMax + 2']} tick={{ fill: '#64748b', fontSize: 10 }} />
                       <YAxis type="number" dataKey="averageScore" name="學業成績" unit="分" domain={[60, 100]} tick={{ fill: '#64748b', fontSize: 10 }}/>
                       <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#ffffff', border: '1px solid #e0e0e0', borderRadius: '8px' }}/>
-                      <Scatter name="學生表現" data={studentPerformanceData} fill="#3b82f6" />
+                      <Scatter name="學生表現" data={filteredData} fill="#3b82f6" />
                     </ScatterChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex items-center justify-center h-full text-slate-500 text-sm">請於後台匯入學生數據以生成圖表</div>
                 )}
               </div>
+              {availableTeams.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <h4 className="text-sm font-bold text-slate-600 dark:text-slate-300 mb-2">篩選校隊:</h4>
+                  <div className="flex flex-wrap gap-x-4 gap-y-2">
+                    {availableTeams.map(team => (
+                      <label key={team} className="flex items-center space-x-2 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={selectedTeams.includes(team)}
+                          onChange={() => handleTeamSelectionChange(team)}
+                          className="form-checkbox h-4 w-4 rounded text-blue-600 transition duration-150 ease-in-out"
+                        />
+                        <span className="text-sm text-slate-700 dark:text-slate-200">{team}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
         </div>
       </Section>
@@ -617,7 +654,13 @@ export default function App() {
         <div className="md:hidden flex items-center p-4 bg-slate-900 text-white border-b border-slate-700"><button className="p-2"><Menu /></button><span className="ml-4 font-bold text-yellow-400">正覺體育人</span></div>
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-100 dark:bg-[#0F0F1B]"><div className="max-w-7xl mx-auto">{renderContent()}</div></main>
       </div>
-      <style>{`.animate-fade-in { animation: fadeIn 0.5s ease-out; } @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } .bg-grid-slate-800 { background-image: linear-gradient(white 1px, transparent 1px), linear-gradient(to right, white 1px, transparent 1px); background-size: 2rem 2rem; opacity: 0.1; }`}</style>
+      <style>{`
+        .animate-fade-in { animation: fadeIn 0.5s ease-out; } 
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } } 
+        .bg-grid-slate-800 { background-image: linear-gradient(white 1px, transparent 1px), linear-gradient(to right, white 1px, transparent 1px); background-size: 2rem 2rem; opacity: 0.1; }
+        .form-checkbox { -webkit-appearance: none; -moz-appearance: none; appearance: none; padding: 0; print-color-adjust: exact; display: inline-block; vertical-align: middle; background-origin: border-box; -webkit-user-select: none; -moz-user-select: none; user-select: none; flex-shrink: 0; height: 1rem; width: 1rem; color: #4f46e5; background-color: #fff; border-color: #6b7280; border-width: 1px; border-radius: 0.25rem; }
+        .form-checkbox:checked { border-color: transparent; background-color: currentColor; background-size: 100% 100%; background-position: center; background-repeat: no-repeat; background-image: url("data:image/svg+xml,%3csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3e%3cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3e%3c/svg%3e"); }
+      `}</style>
     </div>
   );
 }
