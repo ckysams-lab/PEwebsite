@@ -1,11 +1,9 @@
 /**
- * 版本: 2.0 (BIG5 編碼支援 & 動態訓練時數)
+ * 版本: 2.1
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 編碼支援: CSV 匯入功能現在可以正確讀取 BIG5 編碼的檔案，解決繁體中文亂碼問題。
- * 2. 動態 X 軸: 「體學平衡」圖表的 X 軸 (訓練時數) 改為從匯入的 CSV 檔案動態讀取，不再是固定值。
- * 3. 範本更新: CSV 下載範本已加入「每星期訓練時間」欄位，以配合新的圖表數據需求。
- * 4. 完整代碼: 此版本包含所有頁面及功能的完整、未經折疊的代碼。
+ * 1. 新增分頁: 在側邊欄加入「我們的校隊」分頁。
+ * 2. 佈局調整: 首頁的「榮譽榜」與「學業與運動平衡」區塊改為垂直排列，各佔一行。
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -104,6 +102,7 @@ const Button = ({ children, onClick, variant = "primary", disabled = false, clas
 const Sidebar = ({ activeTab, setActiveTab }) => {
   const menuItems = [
     { id: 'home', label: '首頁', icon: <Home size={20} /> },
+    { id: 'teams', label: '我們的校隊', icon: <Users size={20} /> },
     { id: 'fitness', label: '科學化訓練', icon: <Activity size={20} /> },
     { id: 'equipment', label: '器材管理', icon: <Dumbbell size={20} /> },
     { id: 'stars', label: '體育之星', icon: <Star size={20} /> },
@@ -114,7 +113,7 @@ const Sidebar = ({ activeTab, setActiveTab }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.0</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.1</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -228,7 +227,7 @@ const HomePage = () => {
 
       {/* --- 第四層: Outcome & Holistic Development --- */}
       <Section title="成果與全人發展" subtitle="證明體育與學業能夠並行不悖，並著重於每位學生的個人成長。">
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="space-y-8">
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><Trophy className="text-yellow-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">榮譽榜 (The Hall of Fame)</h3></div><ul className="space-y-3"><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">🏆 冠軍榮譽</p><p className="text-xs text-slate-500 dark:text-slate-400">校隊在多項賽事中取得驕人成績。</p></li><li className="bg-slate-50 dark:bg-slate-700/50 p-3 rounded-lg"><p className="font-semibold text-slate-700 dark:text-slate-200">📈 「進步獎」或「突破獎」</p><p className="text-xs text-slate-500 dark:text-slate-400">例子：田徑隊全體隊員平均個人最佳成績(PB)提升 <strong>15%</strong>。</p></li></ul></div>
             <div className="bg-white dark:bg-slate-800 rounded-2xl p-6 shadow-lg border border-slate-200 dark:border-slate-700"><div className="flex items-center mb-4"><BarChart2 className="text-blue-500 mr-3" size={24}/><h3 className="text-xl font-bold text-slate-800 dark:text-white">學業與運動平衡</h3></div><p className="text-sm text-slate-500 dark:text-slate-400 mb-4">數據顯示，適度的體育訓練與學業成績呈正相關或無負面影響。</p>
               <div className="h-48 w-full">
@@ -408,7 +407,27 @@ const ReadingPage = ({ user }) => {
   );
 };
 
-// 7. 後台管理
+// 7. 我們的校隊
+const TeamsPage = () => {
+  const teams = ['壁球', '足球', '籃球', '田徑', '乒乓球', '游泳'];
+  return (
+    <div className="animate-fade-in">
+      <Card theme="dark">
+        <h2 className="text-2xl font-bold text-yellow-400 mb-4 flex items-center"><Users className="mr-3"/>我們的校隊</h2>
+        <p className="text-slate-400 mb-6">這是我們引以為傲的校隊大家庭。點擊了解更多關於各隊伍的資訊。</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {teams.map(team => (
+            <div key={team} className="bg-slate-800 hover:bg-slate-700 transition-colors p-4 rounded-lg text-center cursor-pointer">
+              <p className="font-bold text-white text-lg">{team}隊</p>
+            </div>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+// 8. 後台管理
 const AdminPage = ({ user }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -581,6 +600,7 @@ export default function App() {
   const renderContent = () => {
     switch(activeTab) {
       case 'home': return <HomePage />;
+      case 'teams': return <TeamsPage />;
       case 'fitness': return <FitnessPage user={user} />;
       case 'equipment': return <EquipmentPage user={user} />;
       case 'stars': return <StarsPage />;
