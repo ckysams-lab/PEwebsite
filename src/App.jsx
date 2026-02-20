@@ -2,9 +2,7 @@
  * 版本: 2.7
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 新增校徽: 在網站的右上角新增了學校校徽。
- * 2. 外部資源連結: 校徽圖片從 GitHub Raw 內容服務器直接讀取。
- * 3. 樣式調整: 為校徽添加了適當的大小、邊距和滑鼠懸停提示，以確保視覺效果協調。
+ * 1. 重新加入校徽: 修復了在上一個版本中意外遺漏的校徽，現在校徽會正常顯示在網站右上角。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -868,13 +866,12 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         const loggedInUser = currentUser && !currentUser.isAnonymous ? currentUser : null;
         setUser(loggedInUser);
-        // This logic handles redirecting the user away if they log out FROM a protected page.
         if (!loggedInUser && (activeTab === 'equipment' || activeTab === 'admin')) {
             setActiveTab('home');
         }
     });
     return () => unsubscribe();
-  }, []); // The dependency array is now empty.
+  }, []); 
 
   const renderContent = () => {
     switch(activeTab) {
@@ -882,7 +879,7 @@ export default function App() {
       case 'teams': return <TeamsPage />;
       case 'fitness': return <FitnessPage user={user} />;
       case 'equipment': 
-        return user ? <EquipmentPage user={user} /> : <HomePage />; // Redirect if not logged in
+        return user ? <EquipmentPage user={user} /> : <HomePage />;
       case 'stars': return <StarsPage />;
       case 'reading': return <ReadingPage user={user} />;
       case 'admin': 
@@ -893,6 +890,12 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans overflow-hidden">
+      <img 
+        src="https://raw.githubusercontent.com/ckysams-lab/PEwebsite/b218d095faa067a13944e743ea94ca081adf5218/image%20(1)%20(1).png"
+        alt="School Logo"
+        title="正覺蓮社學校"
+        className="absolute top-4 right-6 w-16 h-16 z-30" 
+      />
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} />
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="md:hidden flex items-center p-4 bg-slate-900 text-white border-b border-slate-700"><button className="p-2"><Menu /></button><span className="ml-4 font-bold text-yellow-400">正覺體育人</span></div>
