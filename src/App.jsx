@@ -1,8 +1,9 @@
 /**
- * 版本: 2.7
+ * 版本: 2.8
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 重新加入校徽: 修復了在上一個版本中意外遺漏的校徽，現在校徽會正常顯示在網站右上角。
+ * 1. 調整校徽位置: 將校徽從網站的右上角移動到左上角側邊欄內。
+ * 2. 整合標題: 校徽現在與「正覺蓮社學校」的名稱並排顯示，成為側邊欄標題的一部分。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -114,9 +115,18 @@ const Sidebar = ({ activeTab, setActiveTab, user }) => {
 
   return (
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
-      <div className="p-6 text-center border-b border-slate-700">
-        <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.7</h2>
+      <div className="p-4 border-b border-slate-700">
+        <div className="flex items-center justify-center">
+            <img 
+              src="https://raw.githubusercontent.com/ckysams-lab/PEwebsite/b218d095faa067a13944e743ea94ca081adf5218/image%20(1)%20(1).png"
+              alt="School Logo"
+              className="h-10 w-10 mr-3"
+            />
+            <div>
+              <h1 className="text-lg font-bold text-yellow-400 text-left">正覺蓮社學校</h1>
+              <h2 className="text-xs text-slate-400 text-left">體育組系統 Ver 2.8</h2>
+            </div>
+        </div>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -871,7 +881,7 @@ export default function App() {
         }
     });
     return () => unsubscribe();
-  }, []); 
+  }, []);
 
   const renderContent = () => {
     switch(activeTab) {
@@ -890,12 +900,6 @@ export default function App() {
 
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-slate-950 font-sans overflow-hidden">
-      <img 
-        src="https://raw.githubusercontent.com/ckysams-lab/PEwebsite/b218d095faa067a13944e743ea94ca081adf5218/image%20(1)%20(1).png"
-        alt="School Logo"
-        title="正覺蓮社學校"
-        className="absolute top-4 right-6 w-16 h-16 z-30" 
-      />
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} user={user} />
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         <div className="md:hidden flex items-center p-4 bg-slate-900 text-white border-b border-slate-700"><button className="p-2"><Menu /></button><span className="ml-4 font-bold text-yellow-400">正覺體育人</span></div>
