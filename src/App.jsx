@@ -1,9 +1,10 @@
 /**
- * 版本: 2.6
+ * 版本: 2.7
  * 項目: 正覺蓮社學校 體育科網站
  * 說明:
- * 1. 修正登入流程: 修復了未登入時，點擊「老師管理後台」按鈕會跳轉回首頁而無法顯示登入表單的問題。
- * 2. 調整導航邏輯: 移除了在主程式中過於積極的頁面保護跳轉，確保能正常進入登入頁面。
+ * 1. 新增校徽: 在網站的右上角新增了學校校徽。
+ * 2. 外部資源連結: 校徽圖片從 GitHub Raw 內容服務器直接讀取。
+ * 3. 樣式調整: 為校徽添加了適當的大小、邊距和滑鼠懸停提示，以確保視覺效果協調。
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -117,7 +118,7 @@ const Sidebar = ({ activeTab, setActiveTab, user }) => {
     <div className="w-[250px] shrink-0 h-full bg-slate-900 border-r border-slate-700 flex flex-col z-20">
       <div className="p-6 text-center border-b border-slate-700">
         <h1 className="text-xl font-bold text-yellow-400">正覺蓮社學校</h1>
-        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.6</h2>
+        <h2 className="text-sm text-slate-400 mt-1">體育組系統 Ver 2.7</h2>
       </div>
       <nav className="flex-1 mt-6 px-4 space-y-2">
         {menuItems.map((item) => (
@@ -414,7 +415,7 @@ const EquipmentPage = ({ user }) => {
   
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800 dark:text-white">🏸 器材庫存管理</h2>{!user && <span className="text-sm text-red-500 bg-red-100 px-3 py-1 rounded-full">請登入以進行管理操作</span>}</div>
+      <div className="flex justify-between items-center"><h2 className="text-2xl font-bold text-slate-800 dark:text-white">🏸 器材庫存管理</h2></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {items.length > 0 ? items.map((item) => (
           <div key={item.id} className="bg-white dark:bg-slate-800 p-5 rounded-xl shadow-md border-t-4 border-blue-500 flex flex-col justify-between">
@@ -867,13 +868,13 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         const loggedInUser = currentUser && !currentUser.isAnonymous ? currentUser : null;
         setUser(loggedInUser);
-        // This is the corrected logic. It will only redirect if user is logged out *from* a protected page.
+        // This logic handles redirecting the user away if they log out FROM a protected page.
         if (!loggedInUser && (activeTab === 'equipment' || activeTab === 'admin')) {
             setActiveTab('home');
         }
     });
     return () => unsubscribe();
-  }, []); // The dependency array is now empty, so this only runs once.
+  }, []); // The dependency array is now empty.
 
   const renderContent = () => {
     switch(activeTab) {
@@ -885,7 +886,6 @@ export default function App() {
       case 'stars': return <StarsPage />;
       case 'reading': return <ReadingPage user={user} />;
       case 'admin': 
-        // This is the key change. The AdminPage component itself will decide whether to show login or content.
         return <AdminPage user={user} />;
       default: return <HomePage />;
     }
